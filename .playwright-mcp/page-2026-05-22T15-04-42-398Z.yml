@@ -1,0 +1,77 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - button "☰" [ref=e6] [cursor=pointer]
+      - heading "⚡ strace-web" [level=1] [ref=e7]:
+        - generic [ref=e8]: ⚡
+        - text: strace-web
+    - generic [ref=e9]: Real-time Syscall Visualization
+  - generic [ref=e10]:
+    - complementary [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - heading "Sessions" [level=4] [ref=e14]
+          - button "↻" [ref=e15] [cursor=pointer]
+        - generic [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: strace -c ls -la
+          - generic [ref=e85]:
+            - generic [ref=e86]: finished
+            - generic [ref=e87]: 0 calls
+          - generic [ref=e88]: 23:03:28
+    - main [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: $
+          - 'textbox "Enter command, e.g.: ls -la /tmp or strace -e trace=network curl example.com" [active] [ref=e22]':
+            - /placeholder: "Enter command, e.g.: ls -la /tmp   or   strace -e trace=network curl example.com"
+            - text: strace -c ls -la
+        - button "▶ Start" [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]: ▶
+          - text: Start
+        - generic [ref=e25]: finished
+      - generic [ref=e27] [cursor=pointer]:
+        - generic [ref=e28]: ▼
+        - text: Statistics
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - generic [ref=e32]: "0"
+            - generic [ref=e33]: Total Syscalls
+          - generic [ref=e34]:
+            - generic [ref=e35]: "0"
+            - generic [ref=e36]: Events / sec
+          - generic [ref=e37]:
+            - generic [ref=e38]: finished
+            - generic [ref=e39]: Status
+        - generic [ref=e40]:
+          - heading "Category Distribution" [level=4] [ref=e42]
+          - heading "Slowest Syscalls" [level=4] [ref=e46]
+          - heading "Events / sec (Timeline)" [level=4] [ref=e50]
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]: "Category:"
+          - button "File" [ref=e56] [cursor=pointer]
+          - button "I/O" [ref=e57] [cursor=pointer]
+          - button "Network" [ref=e58] [cursor=pointer]
+          - button "Process" [ref=e59] [cursor=pointer]
+          - button "Memory" [ref=e60] [cursor=pointer]
+          - button "Sync" [ref=e61] [cursor=pointer]
+          - button "Signal" [ref=e62] [cursor=pointer]
+          - button "Other" [ref=e63] [cursor=pointer]
+        - generic [ref=e64]:
+          - generic [ref=e65]: "Severity:"
+          - button "Normal" [ref=e66] [cursor=pointer]
+          - button "Warning" [ref=e67] [cursor=pointer]
+          - button "Slow" [ref=e68] [cursor=pointer]
+          - button "Blocked" [ref=e69] [cursor=pointer]
+        - generic [ref=e70]:
+          - textbox "syscall..." [ref=e71]
+          - textbox "pid..." [ref=e72]
+      - generic [ref=e74]:
+        - generic [ref=e75]: "#"
+        - generic [ref=e76]: Time
+        - generic [ref=e77]: PID
+        - generic [ref=e78]: Syscall
+        - generic [ref=e79]: Args
+        - generic [ref=e80]: Result
+        - generic [ref=e81]: Duration
