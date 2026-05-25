@@ -33,9 +33,17 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/api/start")
 async def start_trace(req: StartRequest):
     session_id = store.create_session(req.command)
+    return {"session_id": session_id, "status": "created"}
+
+
+@app.post("/api/start/{session_id}")
+async def trigger_trace(session_id: str):
+    s = store.get_session(session_id)
+    if not s:
+        return JSONResponse({"error": "session not found"}, status_code=404)
     runner = StraceRunner()
     active_runners[session_id] = runner
-    asyncio.create_task(_run_trace(session_id, runner, req.command))
+    asyncio.create_task(_run_trace(session_id, runner, s["command"]))
     return {"session_id": session_id, "status": "started"}
 
 
