@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Strace - 系统调用追踪</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        #app {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            color: #00d4aa;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-tabs button {
+            padding: 8px 16px;
+            border: 1px solid #444;
+            background: transparent;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .nav-tabs button.active {
+            background: #00d4aa;
+            color: #1a1a2e;
+            border-color: #00d4aa;
+            font-weight: 600;
+        }
+
+        .nav-tabs button:hover:not(.active) {
+            border-color: #00d4aa;
+            color: #00d4aa;
+        }
+
+        /* 新建追踪 */
+        .start-panel {
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .start-panel h2 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            color: #00d4aa;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            background: #0f3460;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: monospace;
+            font-size: 0.95rem;
+        }
+
+        .input-row input:focus {
+            outline: none;
+            border-color: #00d4aa;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #555;
+            color: #fff;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 6px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.running {
+            background: #00d4aa;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.finished {
+            background: #3498db;
+        }
+
+        .status-dot.error {
+            background: #e74c3c;
+        }
+
+        .status-dot.created {
+            background: #f39c12;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .elapsed-time {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #f39c12;
+        }
+
+        .event-count {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        /* 统计面板 */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px;
+        }
+
+        .stat-card h4 {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .stat-card .value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #00d4aa;
+        }
+
+        /* 分类统计 */
+        .category-bar {
+            display: flex;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+            background: #333;
+        }
+
+        .category-bar .segment {
+            transition: width 0.3s;
+        }
+
+        .category-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.8rem;
+        }
+
+        .category-legend span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        /* 事件表格 */
+        .events-container {
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .events-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid #333;
+        }
+
+        .events-toolbar input {
+            padding: 6px 10px;
+            background: #0f3460;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 0.85rem;
+            width: 240px;
+        }
+
+        .events-toolbar input:focus {
+            outline: none;
+            border-color: #00d4aa;
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .filter-tag {
+            padding: 3px 8px;
+            border: 1px solid #555;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-tag:hover, .filter-tag.active {
+            border-color: #00d4aa;
+            color: #00d4aa;
+        }
+
+        .events-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            font-family: monospace;
+        }
+
+        .events-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .events-table th {
+            background: #0f3460;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #aaa;
+            border-bottom: 1px solid #333;
+        }
+
+        .events-table td {
+            padding: 5px 10px;
+            border-bottom: 1px solid #222;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .events-table tbody tr:hover {
+            background: #1e3a5f;
+        }
+
+        .events-scroll {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .severity-normal { }
+        .severity-warning td:first-child { border-left: 3px solid #f39c12; }
+        .severity-slow td:first-child { border-left: 3px solid #e67e22; }
+        .severity-blocked td:first-child { border-left: 3px solid #e74c3c; }
+
+        .category-file { color: #3498db; }
+        .category-io { color: #2ecc71; }
+        .category-network { color: #9b59b6; }
+        .category-process { color: #e74c3c; }
+        .category-memory { color: #f39c12; }
+        .category-sync { color: #1abc9c; }
+        .category-signal { color: #e91e63; }
+        .category-other { color: #95a5a6; }
+
+        /* 历史列表 */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px 18px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .history-item:hover {
+            border-color: #00d4aa;
+        }
+
+        .history-item .cmd {
+            font-family: monospace;
+            font-size: 0.95rem;
+            color: #e0e0e0;
+        }
+
+        .history-item .meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .history-item .meta .status-badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+        }
+
+        .status-badge.running {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+        }
+
+        .status-badge.finished {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .status-badge.error {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        /* 慢调用列表 */
+        .slow-calls {
+            margin-top: 12px;
+        }
+
+        .slow-calls h3 {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            color: #e67e22;
+        }
+
+        .slow-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #222;
+        }
+
+        .slow-item .duration {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state p {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        /* 自动滚动开关 */
+        .auto-scroll-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .auto-scroll-toggle input[type="checkbox"] {
+            accent-color: #00d4aa;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <header>
+        <h1>Web Strace - 系统调用追踪</h1>
+        <div class="nav-tabs">
+            <button :class="{ active: view === 'trace' }" @click="view = 'trace'">实时追踪</button>
+            <button :class="{ active: view === 'history' }" @click="view = 'history'; loadHistory()">历史记录</button>
+        </div>
+    </header>
+
+    <!-- 实时追踪视图 -->
+    <div v-if="view === 'trace'">
+        <!-- 启动面板 -->
+        <div class="start-panel">
+            <h2>新建追踪</h2>
+            <div class="input-row">
+                <input
+                    v-model="command"
+                    placeholder="输入要追踪的命令，例如：ls -la /tmp"
+                    @keyup.enter="startTrace"
+                    :disabled="status === 'running'"
+                />
+                <button class="btn btn-primary" @click="startTrace" :disabled="!command.trim() || status === 'running'">
+                    开始追踪
+                </button>
+                <button class="btn btn-danger" @click="stopTrace" v-if="status === 'running'">
+                    停止
+                </button>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div class="status-bar" v-if="sessionId">
+            <div class="status-indicator">
+                <span class="status-dot" :class="status"></span>
+                <span>{{ statusText }}</span>
+            </div>
+            <div class="elapsed-time" v-if="status === 'running'">
+                运行时间：{{ elapsedDisplay }}
+            </div>
+            <div class="elapsed-time" v-else-if="finalElapsed">
+                总耗时：{{ finalElapsed }}
+            </div>
+            <div class="event-count">
+                系统调用次数：{{ stats.total_count || 0 }}
+            </div>
+            <div style="margin-left: auto;">
+                <span style="font-size:0.8rem; color:#888;">会话：{{ sessionId }}</span>
+            </div>
+        </div>
+
+        <!-- 统计面板 -->
+        <div v-if="stats.total_count > 0">
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <h4>总调用数</h4>
+                    <div class="value">{{ stats.total_count }}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>文件操作</h4>
+                    <div class="value">{{ stats.category_counts.file || 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>I/O 操作</h4>
+                    <div class="value">{{ stats.category_counts.io || 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>网络</h4>
+                    <div class="value">{{ stats.category_counts.network || 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>进程</h4>
+                    <div class="value">{{ stats.category_counts.process || 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>内存</h4>
+                    <div class="value">{{ stats.category_counts.memory || 0 }}</div>
+                </div>
+            </div>
+
+            <!-- 分类占比条 -->
+            <div class="stat-card" style="margin-bottom: 16px;">
+                <h4>分类占比</h4>
+                <div class="category-bar">
+                    <div v-for="cat in categorySegments" :key="cat.name"
+                         class="segment"
+                         :style="{ width: cat.percent + '%', background: cat.color }">
+                    </div>
+                </div>
+                <div class="category-legend">
+                    <span v-for="cat in categorySegments" :key="cat.name">
+                        <span class="legend-dot" :style="{ background: cat.color }"></span>
+                        {{ cat.label }} {{ cat.percent }}%
+                    </span>
+                </div>
+            </div>
+
+            <!-- 慢调用 -->
+            <div class="stat-card slow-calls" v-if="stats.top_slow && stats.top_slow.length > 0">
+                <h3>耗时最长的调用 (Top {{ stats.top_slow.length }})</h3>
+                <div class="slow-item" v-for="s in stats.top_slow.slice(0, 10)" :key="s.id">
+                    <span>{{ s.syscall }}({{ truncate(s.args, 60) }})</span>
+                    <span class="duration">{{ (s.duration * 1000).toFixed(2) }} ms</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 事件列表 -->
+        <div class="events-container" v-if="events.length > 0" style="margin-top: 16px;">
+            <div class="events-toolbar">
+                <input v-model="filter" placeholder="过滤：输入系统调用名称或参数..." />
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="filter-tags">
+                        <span class="filter-tag" :class="{ active: categoryFilter === '' }" @click="categoryFilter = ''">全部</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'file' }" @click="categoryFilter = 'file'">文件</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'io' }" @click="categoryFilter = 'io'">I/O</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'network' }" @click="categoryFilter = 'network'">网络</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'process' }" @click="categoryFilter = 'process'">进程</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'memory' }" @click="categoryFilter = 'memory'">内存</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'sync' }" @click="categoryFilter = 'sync'">同步</span>
+                        <span class="filter-tag" :class="{ active: categoryFilter === 'signal' }" @click="categoryFilter = 'signal'">信号</span>
+                    </div>
+                    <label class="auto-scroll-toggle">
+                        <input type="checkbox" v-model="autoScroll" />
+                        自动滚动
+                    </label>
+                </div>
+            </div>
+            <div class="events-scroll" ref="eventsScroll">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">#</th>
+                            <th style="width:60px;">PID</th>
+                            <th style="width:110px;">时间戳</th>
+                            <th style="width:120px;">系统调用</th>
+                            <th>参数</th>
+                            <th style="width:100px;">返回值</th>
+                            <th style="width:90px;">耗时(ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="ev in filteredEvents" :key="ev.id"
+                            :class="'severity-' + ev.severity">
+                            <td>{{ ev.id }}</td>
+                            <td>{{ ev.pid }}</td>
+                            <td>{{ ev.timestamp }}</td>
+                            <td :class="'category-' + ev.category">{{ ev.syscall }}</td>
+                            <td :title="ev.args">{{ truncate(ev.args, 80) }}</td>
+                            <td>{{ ev.result }}</td>
+                            <td>{{ ev.duration ? (ev.duration * 1000).toFixed(3) : '-' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="empty-state" v-if="!sessionId">
+            <p>输入命令并点击"开始追踪"来分析系统调用</p>
+        </div>
+    </div>
+
+    <!-- 历史记录视图 -->
+    <div v-if="view === 'history'">
+        <div class="history-list" v-if="sessions.length > 0">
+            <div class="history-item" v-for="s in sessions" :key="s.id" @click="loadSession(s)">
+                <div>
+                    <div class="cmd">{{ s.command }}</div>
+                    <div class="meta" style="margin-top:6px;">
+                        <span>{{ formatTime(s.start_time) }}</span>
+                        <span>调用数：{{ s.total_syscalls }}</span>
+                    </div>
+                </div>
+                <div class="meta">
+                    <span class="status-badge" :class="s.status">{{ statusLabel(s.status) }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="empty-state" v-else>
+            <p>暂无历史记录</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, computed, watch, nextTick, onUnmounted } = Vue;
+
+createApp({
+    setup() {
+        const view = ref('trace');
+        const command = ref('');
+        const sessionId = ref('');
+        const status = ref('');
+        const events = ref([]);
+        const stats = ref({ total_count: 0, category_counts: {}, syscall_counts: {}, top_slow: [] });
+        const filter = ref('');
+        const categoryFilter = ref('');
+        const autoScroll = ref(true);
+        const sessions = ref([]);
+        const eventsScroll = ref(null);
+
+        let ws = null;
+        let startTime = null;
+        let elapsedTimer = null;
+        const elapsed = ref(0);
+        const finalElapsed = ref('');
+
+        const categoryColors = {
+            file: '#3498db',
+            io: '#2ecc71',
+            network: '#9b59b6',
+            process: '#e74c3c',
+            memory: '#f39c12',
+            sync: '#1abc9c',
+            signal: '#e91e63',
+            other: '#95a5a6',
+        };
+
+        const categoryLabels = {
+            file: '文件',
+            io: 'I/O',
+            network: '网络',
+            process: '进程',
+            memory: '内存',
+            sync: '同步',
+            signal: '信号',
+            other: '其他',
+        };
+
+        const statusText = computed(() => {
+            const m = { running: '运行中', finished: '已完成', error: '出错', created: '已创建' };
+            return m[status.value] || status.value;
+        });
+
+        const elapsedDisplay = computed(() => formatElapsed(elapsed.value));
+
+        function formatElapsed(sec) {
+            const m = Math.floor(sec / 60);
+            const s = (sec % 60).toFixed(1);
+            return m > 0 ? `${m}分 ${s}秒` : `${s}秒`;
+        }
+
+        const categorySegments = computed(() => {
+            const counts = stats.value.category_counts || {};
+            const total = stats.value.total_count || 0;
+            if (total === 0) return [];
+            return Object.entries(counts)
+                .filter(([_, v]) => v > 0)
+                .sort((a, b) => b[1] - a[1])
+                .map(([name, count]) => ({
+                    name,
+                    label: categoryLabels[name] || name,
+                    color: categoryColors[name] || '#95a5a6',
+                    percent: ((count / total) * 100).toFixed(1),
+                }));
+        });
+
+        const filteredEvents = computed(() => {
+            let list = events.value;
+            if (categoryFilter.value) {
+                list = list.filter(e => e.category === categoryFilter.value);
+            }
+            if (filter.value) {
+                const q = filter.value.toLowerCase();
+                list = list.filter(e =>
+                    e.syscall.toLowerCase().includes(q) ||
+                    (e.args && e.args.toLowerCase().includes(q))
+                );
+            }
+            return list.slice(-2000);
+        });
+
+        function truncate(str, max) {
+            if (!str) return '';
+            return str.length > max ? str.slice(0, max) + '...' : str;
+        }
+
+        function startElapsedTimer() {
+            startTime = Date.now();
+            elapsed.value = 0;
+            elapsedTimer = setInterval(() => {
+                elapsed.value = (Date.now() - startTime) / 1000;
+            }, 100);
+        }
+
+        function stopElapsedTimer() {
+            if (elapsedTimer) {
+                clearInterval(elapsedTimer);
+                elapsedTimer = null;
+            }
+            if (startTime) {
+                finalElapsed.value = formatElapsed((Date.now() - startTime) / 1000);
+            }
+        }
+
+        async function startTrace() {
+            if (!command.value.trim()) return;
+
+            events.value = [];
+            stats.value = { total_count: 0, category_counts: {}, syscall_counts: {}, top_slow: [] };
+            finalElapsed.value = '';
+
+            try {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command.value }),
+                });
+                const data = await res.json();
+                sessionId.value = data.session_id;
+                status.value = 'created';
+
+                connectWebSocket(data.session_id);
+
+                await fetch(`/api/start/${data.session_id}`, { method: 'POST' });
+                status.value = 'running';
+                startElapsedTimer();
+            } catch (e) {
+                console.error('启动追踪失败:', e);
+                status.value = 'error';
+            }
+        }
+
+        async function stopTrace() {
+            if (!sessionId.value) return;
+            try {
+                await fetch(`/api/stop/${sessionId.value}`, { method: 'POST' });
+            } catch (e) {
+                console.error('停止失败:', e);
+            }
+        }
+
+        function connectWebSocket(sid) {
+            if (ws) {
+                ws.close();
+            }
+
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${proto}//${location.host}/ws/${sid}`);
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+
+                if (msg.type === 'batch') {
+                    events.value.push(...msg.data);
+                    if (events.value.length > 5000) {
+                        events.value = events.value.slice(-3000);
+                    }
+                    if (autoScroll.value) {
+                        nextTick(() => {
+                            const el = eventsScroll.value;
+                            if (el) el.scrollTop = el.scrollHeight;
+                        });
+                    }
+                } else if (msg.type === 'stats') {
+                    stats.value = msg.data;
+                } else if (msg.type === 'status') {
+                    status.value = msg.data.state;
+                    if (msg.data.state === 'finished' || msg.data.state === 'error') {
+                        stopElapsedTimer();
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                if (status.value === 'running') {
+                    setTimeout(() => connectWebSocket(sid), 2000);
+                }
+            };
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/sessions');
+                sessions.value = await res.json();
+            } catch (e) {
+                console.error('加载历史失败:', e);
+            }
+        }
+
+        async function loadSession(session) {
+            view.value = 'trace';
+            sessionId.value = session.id;
+            status.value = session.status;
+            command.value = session.command;
+            finalElapsed.value = '';
+            events.value = [];
+            stats.value = { total_count: 0, category_counts: {}, syscall_counts: {}, top_slow: [] };
+
+            if (session.start_time && session.end_time) {
+                const start = new Date(session.start_time).getTime();
+                const end = new Date(session.end_time).getTime();
+                finalElapsed.value = formatElapsed((end - start) / 1000);
+            }
+
+            try {
+                const res = await fetch(`/api/sessions/${session.id}/events?limit=2000`);
+                const data = await res.json();
+                events.value = data;
+
+                const catCounts = {};
+                const scCounts = {};
+                const slow = [];
+                for (const ev of data) {
+                    catCounts[ev.category] = (catCounts[ev.category] || 0) + 1;
+                    scCounts[ev.syscall] = (scCounts[ev.syscall] || 0) + 1;
+                    if (ev.duration && ev.duration > 0.01) {
+                        slow.push(ev);
+                    }
+                }
+                slow.sort((a, b) => (b.duration || 0) - (a.duration || 0));
+                stats.value = {
+                    total_count: session.total_syscalls || data.length,
+                    category_counts: catCounts,
+                    syscall_counts: scCounts,
+                    top_slow: slow.slice(0, 20),
+                };
+
+                if (session.status === 'running') {
+                    connectWebSocket(session.id);
+                    startElapsedTimer();
+                }
+            } catch (e) {
+                console.error('加载会话数据失败:', e);
+            }
+        }
+
+        function formatTime(iso) {
+            if (!iso) return '-';
+            const d = new Date(iso);
+            return d.toLocaleString('zh-CN');
+        }
+
+        function statusLabel(s) {
+            const m = { running: '运行中', finished: '已完成', error: '出错' };
+            return m[s] || s;
+        }
+
+        onUnmounted(() => {
+            if (ws) ws.close();
+            stopElapsedTimer();
+        });
+
+        return {
+            view, command, sessionId, status, events, stats,
+            filter, categoryFilter, autoScroll, sessions, eventsScroll,
+            statusText, elapsedDisplay, finalElapsed, categorySegments, filteredEvents,
+            truncate, startTrace, stopTrace, loadHistory, loadSession,
+            formatTime, statusLabel,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
